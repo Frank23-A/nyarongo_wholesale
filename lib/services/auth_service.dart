@@ -25,14 +25,20 @@ class AuthService {
     }
 
     await user.updateDisplayName(displayName);
-    await _firestore.collection('users').doc(user.uid).set({
-      'uid': user.uid,
-      'displayName': displayName,
-      'email': email,
-      'role': role.name,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'displayName': displayName,
+        'email': email,
+        'role': role.name,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (error) {
+      if (error.code != 'permission-denied') {
+        rethrow;
+      }
+    }
 
     return credential;
   }
