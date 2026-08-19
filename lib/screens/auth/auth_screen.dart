@@ -24,6 +24,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool isLogin = true;
   bool obscurePassword = true;
   bool _isSubmitting = false;
+  bool _isSendingResetEmail = false;
   UserRole selectedRole = UserRole.customer;
   final TextEditingController _nameController =
       TextEditingController(text: 'Nyarongo User');
@@ -218,14 +219,33 @@ class _AuthScreenState extends State<AuthScreen> {
                               const SizedBox(height: 6),
                               Align(
                                 alignment: Alignment.centerRight,
-                                child: Text(
-                                  isLogin
-                                      ? 'Forgot password?'
-                                      : 'Use 1 uppercase, 1 lowercase, 1 number and 1 special character.',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: const Color(0xFF4F6580),
-                                  ),
-                                ),
+                                child: isLogin
+                                    ? TextButton(
+                                        onPressed: _isSendingResetEmail
+                                            ? null
+                                            : _sendPasswordResetEmail,
+                                        style: TextButton.styleFrom(
+                                          foregroundColor:
+                                              const Color(0xFF4F6580),
+                                          minimumSize: Size.zero,
+                                          padding: EdgeInsets.zero,
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                          textStyle: theme.textTheme.bodySmall,
+                                        ),
+                                        child: Text(
+                                          _isSendingResetEmail
+                                              ? 'Sending reset email...'
+                                              : 'Forgot password?',
+                                        ),
+                                      )
+                                    : Text(
+                                        'Use 1 uppercase, 1 lowercase, 1 number and 1 special character.',
+                                        style:
+                                            theme.textTheme.bodySmall?.copyWith(
+                                          color: const Color(0xFF4F6580),
+                                        ),
+                                      ),
                               ),
                               const SizedBox(height: 18),
                               _AuthFieldLabel(
@@ -429,6 +449,58 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _sendPasswordResetEmail() async {
+    final email = _emailController.text.trim();
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() {
+        passwordErrorText =
+            'Enter your registered email address before resetting password.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSendingResetEmail = true;
+      passwordErrorText = null;
+    });
+
+    try {
+      await _authService.sendPasswordResetEmail(email);
+
+      if (!mounted) {
+        return;
+      }
+
+      messenger.showSnackBar(
+        SnackBar(content: Text('Password reset email sent to $email.')),
+      );
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        passwordErrorText = _passwordResetErrorMessage(error);
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        passwordErrorText = 'Could not send reset email: $error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSendingResetEmail = false;
+        });
+      }
+    }
+  }
+
   String _authErrorMessage(FirebaseAuthException error) {
     switch (error.code) {
       case 'email-already-in-use':
@@ -445,6 +517,19 @@ class _AuthScreenState extends State<AuthScreen> {
         return 'Network error. Check your internet connection and try again.';
       default:
         return error.message ?? 'Authentication failed. Please try again.';
+    }
+  }
+
+  String _passwordResetErrorMessage(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'invalid-email':
+        return 'Enter a valid email address.';
+      case 'user-not-found':
+        return 'No account exists for that email address.';
+      case 'network-request-failed':
+        return 'Network error. Check your internet connection and try again.';
+      default:
+        return error.message ?? 'Could not send reset email. Please try again.';
     }
   }
 
