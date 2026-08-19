@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-// Import your fixed pages (update paths to match your project structure)
-import 'contact_list_page.dart';
-import 'contact_picker_page.dart';
+import 'contacts_list_page.dart';
+import 'contacts_picker_page.dart';
 
 void main() => runApp(const ContactsExampleApp());
 

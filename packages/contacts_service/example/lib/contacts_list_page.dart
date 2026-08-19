@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:contacts_service/contacts_service.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 // ── Contact List Page ──────────────────────────────────────────────────────────
 class ContactListPage extends StatefulWidget {
@@ -35,10 +35,7 @@ class _ContactListPageState extends State<ContactListPage> {
       return;
     }
 
-    final contacts = await FlutterContacts.getContacts(
-      withProperties: true,
-      withPhoto: true,
-    );
+    final contacts = await ContactsService.getContacts();
 
     setState(() {
       _contacts = contacts;
@@ -94,7 +91,7 @@ class _ContactListPageState extends State<ContactListPage> {
                                 onContactUpdated: (updated) {
                                   setState(() {
                                     final i = _contacts.indexWhere(
-                                        (x) => x.id == updated.id);
+                                        (x) => x.identifier == updated.identifier);
                                     if (i != -1) _contacts[i] = updated;
                                   });
                                 },
@@ -103,25 +100,32 @@ class _ContactListPageState extends State<ContactListPage> {
                           );
                           refreshContacts();
                         },
-                        leading: (c.photo != null && c.photo!.isNotEmpty)
+                        leading: (c.avatar != null && c.avatar!.isNotEmpty)
                             ? CircleAvatar(
-                                backgroundImage: MemoryImage(c.photo!))
+                                backgroundImage: MemoryImage(c.avatar!))
                             : CircleAvatar(
                                 child: Text(
-                                  c.displayName.isNotEmpty
-                                      ? c.displayName[0].toUpperCase()
+                                  _displayName(c).isNotEmpty
+                                      ? _displayName(c)[0].toUpperCase()
                                       : '?',
                                 ),
                               ),
-                        title: Text(c.displayName),
-                        subtitle: c.phones.isNotEmpty
-                            ? Text(c.phones.first.number)
+                        title: Text(_displayName(c)),
+                        subtitle: c.phones?.isNotEmpty == true
+                            ? Text(c.phones!.first.value ?? '')
                             : null,
                       );
                     },
                   ),
       ),
     );
+  }
+
+  String _displayName(Contact contact) {
+    return contact.displayName ??
+        [contact.givenName, contact.familyName]
+            .where((part) => part?.isNotEmpty == true)
+            .join(' ');
   }
 }
 
@@ -153,7 +157,7 @@ class ContactDetailsPage extends StatelessWidget {
       ),
     );
     if (confirmed == true) {
-      await FlutterContacts.deleteContact(_contact);
+      await ContactsService.deleteContact(_contact);
       if (context.mounted) Navigator.of(context).pop();
     }
   }
@@ -161,9 +165,10 @@ class ContactDetailsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = _contact;
+    final displayName = _displayName(c);
     return Scaffold(
       appBar: AppBar(
-        title: Text(c.displayName),
+        title: Text(displayName),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete),
@@ -191,82 +196,73 @@ class ContactDetailsPage extends StatelessWidget {
         child: ListView(
           children: [
             // Avatar
-            if (c.photo != null && c.photo!.isNotEmpty)
+            if (c.avatar != null && c.avatar!.isNotEmpty)
               Center(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: CircleAvatar(
                     radius: 48,
-                    backgroundImage: MemoryImage(c.photo!),
+                    backgroundImage: MemoryImage(c.avatar!),
                   ),
                 ),
               ),
 
             // Name fields
-            _tile('First name', c.name.first),
-            _tile('Middle name', c.name.middle),
-            _tile('Last name', c.name.last),
-            _tile('Prefix', c.name.prefix),
-            _tile('Suffix', c.name.suffix),
+            _tile('First name', c.givenName),
+            _tile('Middle name', c.middleName),
+            _tile('Last name', c.familyName),
+            _tile('Prefix', c.prefix),
+            _tile('Suffix', c.suffix),
 
             // Birthday
-            if (c.events.isNotEmpty)
+            if (c.birthday != null)
               _tile(
                 'Birthday',
-                c.events
-                    .where((e) => e.label == EventLabel.birthday)
-                    .map((e) {
-                      final d =
-                          DateTime(e.year ?? 0, e.month, e.day);
-                      return DateFormat('dd-MM-yyyy').format(d);
-                    })
-                    .firstOrNull ?? '',
+                DateFormat('dd-MM-yyyy').format(c.birthday!),
               ),
 
             // Organization
-            if (c.organizations.isNotEmpty) ...[
-              _tile('Company', c.organizations.first.company),
-              _tile('Job', c.organizations.first.title),
-            ],
+            _tile('Company', c.company),
+            _tile('Job', c.jobTitle),
 
             // Phones
-            if (c.phones.isNotEmpty) ...[
+            if (c.phones?.isNotEmpty == true) ...[
               const ListTile(title: Text('Phones', style: TextStyle(fontWeight: FontWeight.bold))),
-              for (final p in c.phones)
+              for (final p in c.phones!)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: ListTile(
-                    title: Text(p.label.name),
-                    trailing: Text(p.number),
+                    title: Text(p.label ?? ''),
+                    trailing: Text(p.value ?? ''),
                   ),
                 ),
             ],
 
             // Emails
-            if (c.emails.isNotEmpty) ...[
+            if (c.emails?.isNotEmpty == true) ...[
               const ListTile(title: Text('Emails', style: TextStyle(fontWeight: FontWeight.bold))),
-              for (final e in c.emails)
+              for (final e in c.emails!)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: ListTile(
-                    title: Text(e.label.name),
-                    trailing: Text(e.address),
+                    title: Text(e.label ?? ''),
+                    trailing: Text(e.value ?? ''),
                   ),
                 ),
             ],
 
             // Addresses
-            if (c.addresses.isNotEmpty) ...[
+            if (c.postalAddresses?.isNotEmpty == true) ...[
               const ListTile(title: Text('Addresses', style: TextStyle(fontWeight: FontWeight.bold))),
-              for (final a in c.addresses)
+              for (final a in c.postalAddresses!)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
                     children: [
                       _tile('Street', a.street),
                       _tile('City', a.city),
-                      _tile('Region', a.state),
-                      _tile('Postcode', a.postalCode),
+                      _tile('Region', a.region),
+                      _tile('Postcode', a.postcode),
                       _tile('Country', a.country),
                     ],
                   ),
@@ -278,8 +274,15 @@ class ContactDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _tile(String label, String value) {
-    if (value.isEmpty) return const SizedBox.shrink();
+  String _displayName(Contact contact) {
+    return contact.displayName ??
+        [contact.givenName, contact.familyName]
+            .where((part) => part?.isNotEmpty == true)
+            .join(' ');
+  }
+
+  Widget _tile(String label, String? value) {
+    if (value == null || value.isEmpty) return const SizedBox.shrink();
     return ListTile(
       title: Text(label),
       trailing: Text(value),
@@ -315,41 +318,34 @@ class _AddContactPageState extends State<AddContactPage> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final contact = Contact()
-      ..name = Name(
-        first: _firstName.text.trim(),
-        middle: _middleName.text.trim(),
-        last: _lastName.text.trim(),
-        prefix: _prefix.text.trim(),
-        suffix: _suffix.text.trim(),
-      )
-      ..phones = _phone.text.trim().isEmpty
+    final contact = Contact(
+      givenName: _firstName.text.trim(),
+      middleName: _middleName.text.trim(),
+      familyName: _lastName.text.trim(),
+      prefix: _prefix.text.trim(),
+      suffix: _suffix.text.trim(),
+      phones: _phone.text.trim().isEmpty
           ? []
-          : [Phone(_phone.text.trim(), label: PhoneLabel.mobile)]
-      ..emails = _email.text.trim().isEmpty
+          : [Item(label: 'mobile', value: _phone.text.trim())],
+      emails: _email.text.trim().isEmpty
           ? []
-          : [Email(_email.text.trim(), label: EmailLabel.work)]
-      ..organizations = (_company.text.trim().isEmpty && _job.text.trim().isEmpty)
-          ? []
-          : [
-              Organization(
-                company: _company.text.trim(),
-                title: _job.text.trim(),
-              )
-            ]
-      ..addresses = (_street.text.trim().isEmpty && _city.text.trim().isEmpty)
+          : [Item(label: 'work', value: _email.text.trim())],
+      company: _company.text.trim(),
+      jobTitle: _job.text.trim(),
+      postalAddresses: (_street.text.trim().isEmpty && _city.text.trim().isEmpty)
           ? []
           : [
-              Address(
+              PostalAddress(
                 street: _street.text.trim(),
                 city: _city.text.trim(),
-                state: _region.text.trim(),
-                postalCode: _postcode.text.trim(),
+                region: _region.text.trim(),
+                postcode: _postcode.text.trim(),
                 country: _country.text.trim(),
               )
-            ];
+            ],
+    );
 
-    await FlutterContacts.insertContact(contact);
+    await ContactsService.addContact(contact);
     if (mounted) Navigator.of(context).pop(true);
   }
 
@@ -446,69 +442,59 @@ class _UpdateContactPageState extends State<UpdateContactPage> {
   void initState() {
     super.initState();
     final c = widget.contact;
-    _firstName = TextEditingController(text: c.name.first);
-    _middleName = TextEditingController(text: c.name.middle);
-    _lastName = TextEditingController(text: c.name.last);
-    _prefix = TextEditingController(text: c.name.prefix);
-    _suffix = TextEditingController(text: c.name.suffix);
+    _firstName = TextEditingController(text: c.givenName);
+    _middleName = TextEditingController(text: c.middleName);
+    _lastName = TextEditingController(text: c.familyName);
+    _prefix = TextEditingController(text: c.prefix);
+    _suffix = TextEditingController(text: c.suffix);
     _phone = TextEditingController(
-        text: c.phones.isNotEmpty ? c.phones.first.number : '');
+        text: c.phones?.isNotEmpty == true ? c.phones!.first.value : '');
     _email = TextEditingController(
-        text: c.emails.isNotEmpty ? c.emails.first.address : '');
-    _company = TextEditingController(
-        text: c.organizations.isNotEmpty ? c.organizations.first.company : '');
-    _job = TextEditingController(
-        text: c.organizations.isNotEmpty ? c.organizations.first.title : '');
+        text: c.emails?.isNotEmpty == true ? c.emails!.first.value : '');
+    _company = TextEditingController(text: c.company);
+    _job = TextEditingController(text: c.jobTitle);
     _street = TextEditingController(
-        text: c.addresses.isNotEmpty ? c.addresses.first.street : '');
+        text: c.postalAddresses?.isNotEmpty == true ? c.postalAddresses!.first.street : '');
     _city = TextEditingController(
-        text: c.addresses.isNotEmpty ? c.addresses.first.city : '');
+        text: c.postalAddresses?.isNotEmpty == true ? c.postalAddresses!.first.city : '');
     _region = TextEditingController(
-        text: c.addresses.isNotEmpty ? c.addresses.first.state : '');
+        text: c.postalAddresses?.isNotEmpty == true ? c.postalAddresses!.first.region : '');
     _postcode = TextEditingController(
-        text: c.addresses.isNotEmpty ? c.addresses.first.postalCode : '');
+        text: c.postalAddresses?.isNotEmpty == true ? c.postalAddresses!.first.postcode : '');
     _country = TextEditingController(
-        text: c.addresses.isNotEmpty ? c.addresses.first.country : '');
+        text: c.postalAddresses?.isNotEmpty == true ? c.postalAddresses!.first.country : '');
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     final updated = widget.contact
-      ..name = Name(
-        first: _firstName.text.trim(),
-        middle: _middleName.text.trim(),
-        last: _lastName.text.trim(),
-        prefix: _prefix.text.trim(),
-        suffix: _suffix.text.trim(),
-      )
+      ..givenName = _firstName.text.trim()
+      ..middleName = _middleName.text.trim()
+      ..familyName = _lastName.text.trim()
+      ..prefix = _prefix.text.trim()
+      ..suffix = _suffix.text.trim()
       ..phones = _phone.text.trim().isEmpty
           ? []
-          : [Phone(_phone.text.trim(), label: PhoneLabel.mobile)]
+          : [Item(label: 'mobile', value: _phone.text.trim())]
       ..emails = _email.text.trim().isEmpty
           ? []
-          : [Email(_email.text.trim(), label: EmailLabel.work)]
-      ..organizations = (_company.text.trim().isEmpty && _job.text.trim().isEmpty)
+          : [Item(label: 'work', value: _email.text.trim())]
+      ..company = _company.text.trim()
+      ..jobTitle = _job.text.trim()
+      ..postalAddresses = (_street.text.trim().isEmpty && _city.text.trim().isEmpty)
           ? []
           : [
-              Organization(
-                company: _company.text.trim(),
-                title: _job.text.trim(),
-              )
-            ]
-      ..addresses = (_street.text.trim().isEmpty && _city.text.trim().isEmpty)
-          ? []
-          : [
-              Address(
+              PostalAddress(
                 street: _street.text.trim(),
                 city: _city.text.trim(),
-                state: _region.text.trim(),
-                postalCode: _postcode.text.trim(),
+                region: _region.text.trim(),
+                postcode: _postcode.text.trim(),
                 country: _country.text.trim(),
               )
             ];
 
-    await FlutterContacts.updateContact(updated);
+    await ContactsService.updateContact(updated);
     if (mounted) Navigator.of(context).pop(updated);
   }
 

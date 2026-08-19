@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:contacts_service/contacts_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class ContactPickerPage extends StatefulWidget {
@@ -27,10 +27,7 @@ class _ContactPickerPageState extends State<ContactPickerPage> {
     setState(() => _loading = true);
 
     try {
-      final contacts = await FlutterContacts.getContacts(
-        withProperties: true,
-        withPhoto: false,
-      );
+      final contacts = await ContactsService.getContacts(withThumbnails: false);
 
       if (!mounted) return;
 
@@ -94,8 +91,8 @@ class _ContactPickerPageState extends State<ContactPickerPage> {
                             CircleAvatar(
                               radius: 28,
                               child: Text(
-                                _contact!.displayName.isNotEmpty
-                                    ? _contact!.displayName[0].toUpperCase()
+                                _displayName(_contact!).isNotEmpty
+                                    ? _displayName(_contact!)[0].toUpperCase()
                                     : '?',
                                 style: const TextStyle(fontSize: 22),
                               ),
@@ -103,7 +100,7 @@ class _ContactPickerPageState extends State<ContactPickerPage> {
                             const SizedBox(width: 16),
                             Expanded(
                               child: Text(
-                                _contact!.displayName,
+                                _displayName(_contact!),
                                 style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold),
@@ -111,21 +108,21 @@ class _ContactPickerPageState extends State<ContactPickerPage> {
                             ),
                           ],
                         ),
-                        if (_contact!.phones.isNotEmpty) ...[
+                        if (_contact!.phones?.isNotEmpty == true) ...[
                           const SizedBox(height: 12),
                           const Text('Phone numbers:',
                               style: TextStyle(fontWeight: FontWeight.w600)),
-                          for (final p in _contact!.phones)
+                          for (final p in _contact!.phones!)
                             Padding(
                               padding: const EdgeInsets.only(top: 4),
                               child: Row(
                                 children: [
                                   const Icon(Icons.phone, size: 16),
                                   const SizedBox(width: 8),
-                                  Text(p.number),
+                                  Text(p.value ?? ''),
                                   const SizedBox(width: 8),
                                   Text(
-                                    '(${p.label.name})',
+                                    '(${p.label ?? ''})',
                                     style: TextStyle(
                                         color: Theme.of(context)
                                             .colorScheme
@@ -135,18 +132,18 @@ class _ContactPickerPageState extends State<ContactPickerPage> {
                               ),
                             ),
                         ],
-                        if (_contact!.emails.isNotEmpty) ...[
+                        if (_contact!.emails?.isNotEmpty == true) ...[
                           const SizedBox(height: 12),
                           const Text('Emails:',
                               style: TextStyle(fontWeight: FontWeight.w600)),
-                          for (final e in _contact!.emails)
+                          for (final e in _contact!.emails!)
                             Padding(
                               padding: const EdgeInsets.only(top: 4),
                               child: Row(
                                 children: [
                                   const Icon(Icons.email, size: 16),
                                   const SizedBox(width: 8),
-                                  Text(e.address),
+                                  Text(e.value ?? ''),
                                 ],
                               ),
                             ),
@@ -167,6 +164,13 @@ class _ContactPickerPageState extends State<ContactPickerPage> {
       ),
     );
   }
+
+  String _displayName(Contact contact) {
+    return contact.displayName ??
+        [contact.givenName, contact.familyName]
+            .where((part) => part?.isNotEmpty == true)
+            .join(' ');
+  }
 }
 
 // ── Contact Picker Dialog ──────────────────────────────────────────────────────
@@ -185,7 +189,7 @@ class _ContactPickerDialogState extends State<_ContactPickerDialog> {
     if (_query.isEmpty) return widget.contacts;
     final lower = _query.toLowerCase();
     return widget.contacts
-        .where((c) => c.displayName.toLowerCase().contains(lower))
+        .where((c) => _displayName(c).toLowerCase().contains(lower))
         .toList();
   }
 
@@ -223,14 +227,14 @@ class _ContactPickerDialogState extends State<_ContactPickerDialog> {
                         return ListTile(
                           leading: CircleAvatar(
                             child: Text(
-                              c.displayName.isNotEmpty
-                                  ? c.displayName[0].toUpperCase()
+                              _displayName(c).isNotEmpty
+                                  ? _displayName(c)[0].toUpperCase()
                                   : '?',
                             ),
                           ),
-                          title: Text(c.displayName),
-                          subtitle: c.phones.isNotEmpty
-                              ? Text(c.phones.first.number)
+                          title: Text(_displayName(c)),
+                          subtitle: c.phones?.isNotEmpty == true
+                              ? Text(c.phones!.first.value ?? '')
                               : null,
                           onTap: () => Navigator.of(context).pop(c),
                         );
@@ -241,5 +245,12 @@ class _ContactPickerDialogState extends State<_ContactPickerDialog> {
         ),
       ),
     );
+  }
+
+  String _displayName(Contact contact) {
+    return contact.displayName ??
+        [contact.givenName, contact.familyName]
+            .where((part) => part?.isNotEmpty == true)
+            .join(' ');
   }
 }
