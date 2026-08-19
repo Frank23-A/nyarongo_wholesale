@@ -1,0 +1,25 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "nyarongo",
+          "appId": "1:1057675349160:android:ef83703ffd8bd39a15469d",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "nyarongo",
+          "configurations": {
+            "android": "1:1057675349160:android:ef83703ffd8bd39a15469d",
+            "ios": "1:1057675349160:ios:99f54c9ba70f232115469d",
+            "macos": "1:1057675349160:ios:99f54c9ba70f232115469d",
+            "web": "1:1057675349160:web:c185c2cd0815d4aa15469d",
+            "windows": "1:1057675349160:web:ed4d124828b872a815469d"
+          }
+        }
+      }
+    }
+  }
+}

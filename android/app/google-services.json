@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1057675349160",
+    "project_id": "nyarongo",
+    "storage_bucket": "nyarongo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1057675349160:android:ef83703ffd8bd39a15469d",
+        "android_client_info": {
+          "package_name": "com.nyarongo.wholesale"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmI3cZCyD-DtzJ-tH51KZCjbk2Zv2Fx0E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
