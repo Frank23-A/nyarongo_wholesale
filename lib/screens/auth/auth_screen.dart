@@ -383,6 +383,10 @@ class _AuthScreenState extends State<AuthScreen> {
           email: email,
           password: password,
         );
+        await _authService.saveCurrentUserProfile(
+          displayName: displayName.isEmpty ? 'Nyarongo User' : displayName,
+          role: selectedRole,
+        );
       } else {
         await _authService.createAccount(
           email: email,
