@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:nyarongo_wholesale/services/auth_service.dart';
 import 'package:nyarongo_wholesale/utils/constants.dart';
 import 'package:nyarongo_wholesale/utils/enums.dart';
 
@@ -18,8 +20,10 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
+  final AuthService _authService = AuthService();
   bool isLogin = true;
   bool obscurePassword = true;
+  bool _isSubmitting = false;
   UserRole selectedRole = UserRole.customer;
   final TextEditingController _nameController =
       TextEditingController(text: 'Nyarongo User');
@@ -124,7 +128,10 @@ class _AuthScreenState extends State<AuthScreen> {
                                 ],
                                 selected: {isLogin},
                                 onSelectionChanged: (selection) {
-                                  setState(() => isLogin = selection.first);
+                                  setState(() {
+                                    isLogin = selection.first;
+                                    passwordErrorText = null;
+                                  });
                                 },
                               ),
                               const SizedBox(height: 18),
@@ -257,7 +264,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               SizedBox(
                                 height: 46,
                                 child: FilledButton(
-                                  onPressed: _submit,
+                                  onPressed: _isSubmitting ? null : _submit,
                                   style: FilledButton.styleFrom(
                                     backgroundColor: const Color(0xFF4A84F0),
                                     foregroundColor: Colors.white,
@@ -269,9 +276,19 @@ class _AuthScreenState extends State<AuthScreen> {
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  child: Text(
-                                    isLogin ? 'Sign In' : 'Create Account',
-                                  ),
+                                  child: _isSubmitting
+                                      ? const SizedBox.square(
+                                          dimension: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.4,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Text(
+                                          isLogin
+                                              ? 'Sign In'
+                                              : 'Create Account',
+                                        ),
                                 ),
                               ),
                               const SizedBox(height: 14),
@@ -327,9 +344,27 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  void _submit() {
-    final validationMessage =
-        _validatePassword(_passwordController.text.trim());
+  Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final displayName =
+        isLogin ? email.split('@').first : _nameController.text.trim();
+
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() {
+        passwordErrorText = 'Enter a valid email address.';
+      });
+      return;
+    }
+
+    if (!isLogin && displayName.isEmpty) {
+      setState(() {
+        passwordErrorText = 'Enter your full name.';
+      });
+      return;
+    }
+
+    final validationMessage = _validatePassword(password);
     if (validationMessage != null) {
       setState(() {
         passwordErrorText = validationMessage;
@@ -337,14 +372,76 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
-    final displayName = isLogin
-        ? _emailController.text.split('@').first
-        : _nameController.text.trim();
+    setState(() {
+      _isSubmitting = true;
+      passwordErrorText = null;
+    });
 
-    widget.onAuthenticated(
-      role: selectedRole,
-      displayName: displayName.isEmpty ? 'Nyarongo User' : displayName,
-    );
+    try {
+      if (isLogin) {
+        await _authService.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      } else {
+        await _authService.createAccount(
+          email: email,
+          password: password,
+          displayName: displayName,
+          role: selectedRole,
+        );
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      widget.onAuthenticated(
+        role: selectedRole,
+        displayName: displayName.isEmpty ? 'Nyarongo User' : displayName,
+      );
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        passwordErrorText = _authErrorMessage(error);
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        passwordErrorText = 'Authentication failed: $error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  String _authErrorMessage(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'email-already-in-use':
+        return 'That email is already registered. Try logging in instead.';
+      case 'invalid-email':
+        return 'Enter a valid email address.';
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'The email or password is incorrect.';
+      case 'weak-password':
+        return 'Choose a stronger password.';
+      case 'network-request-failed':
+        return 'Network error. Check your internet connection and try again.';
+      default:
+        return error.message ?? 'Authentication failed. Please try again.';
+    }
   }
 
   String? _validatePassword(String password) {
