@@ -1,0 +1,6 @@
+services:
+  nyarongowholesale:
+    image: nyarongowholesale
+    build:
+      context: .
+      dockerfile: ./Dockerfile
